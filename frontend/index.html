@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SiteScout — Find Clients Who Need a Website</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root {
+    --bg: #070710;
+    --surface: #0e0e1c;
+    --card: #14142a;
+    --border: #1e1e38;
+    --accent: #6366f1;
+    --accent-hover: #4f46e5;
+    --accent-glow: rgba(99,102,241,0.2);
+    --green: #10b981;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --text: #f0f0f8;
+    --muted: #64648a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, -apple-system, sans-serif; min-height: 100vh; }
+  .btn-primary { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 10px 20px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.15s, box-shadow 0.15s; }
+  .btn-primary:hover { background: var(--accent-hover); box-shadow: 0 0 20px var(--accent-glow); }
+  .btn-secondary { background: transparent; color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px 20px; font-size: 14px; font-weight: 500; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+  .btn-secondary:hover { border-color: var(--accent); background: var(--accent-glow); }
+  .btn-ghost { background: transparent; color: var(--muted); border: none; padding: 8px 14px; font-size: 13px; cursor: pointer; border-radius: 6px; transition: color 0.15s, background 0.15s; }
+  .btn-ghost:hover { color: var(--text); background: var(--card); }
+  .input { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; font-size: 14px; width: 100%; outline: none; transition: border-color 0.15s; }
+  .input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  .badge-red { background: rgba(239,68,68,0.12); color: #ef4444; }
+  .badge-amber { background: rgba(245,158,11,0.12); color: #f59e0b; }
+  .badge-green { background: rgba(16,185,129,0.12); color: #10b981; }
+  .badge-blue { background: rgba(99,102,241,0.12); color: #818cf8; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; background: var(--surface); color: var(--muted); }
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(6px); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .modal { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 32px; width: 100%; max-width: 480px; }
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.15); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .glow-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse-dot 2s ease-in-out infinite; }
+  @keyframes pulse-dot { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+  .score-bar { height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; }
+  .score-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
+  .fade-in { animation: fadeIn 0.3s ease forwards; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px);} to{opacity:1;transform:none;} }
+  .tooltip { position: relative; }
+  .tooltip:hover::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); background: #1e1e38; border: 1px solid var(--border); color: var(--text); font-size: 12px; padding: 6px 10px; border-radius: 6px; white-space: nowrap; z-index: 10; pointer-events: none; }
+  textarea.input { resize: vertical; min-height: 100px; font-family: inherit; }
+  .status-pill { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s; border: none; }
+  .status-new { background: rgba(100,100,138,0.15); color: var(--muted); }
+  .status-contacted { background: rgba(99,102,241,0.12); color: #818cf8; }
+  .status-interested { background: rgba(245,158,11,0.12); color: #f59e0b; }
+  .status-won { background: rgba(16,185,129,0.12); color: #10b981; }
+  .status-passed { background: rgba(239,68,68,0.08); color: #f87171; }
+  select.input { -webkit-appearance: none; appearance: none; cursor: pointer; }
+  .copy-btn { background: none; border: none; cursor: pointer; color: var(--muted); padding: 4px; border-radius: 4px; transition: color 0.15s; display: inline-flex; align-items: center; }
+  .copy-btn:hover { color: var(--text); }
+  .pro-badge { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+  pre, code.block { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; color: #c0c0e0; font-family: inherit; }
+  .niche-pill { padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border); background: var(--surface); font-size: 12px; color: var(--muted); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+  .niche-pill:hover { border-color: var(--accent); color: var(--text); background: var(--accent-glow); }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ════════════════ LANDING PAGE ════════════════ -->
+<div id="landing" class="hidden">
+  <!-- Nav -->
+  <nav style="border-bottom:1px solid var(--border);background:rgba(7,7,16,0.9);backdrop-filter:blur(12px);position:sticky;top:0;z-index:50;">
+    <div style="max-width:1100px;margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:60px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="13" stroke="#6366f1" stroke-width="2"/><circle cx="14" cy="14" r="7" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="2 2"/><circle cx="14" cy="14" r="2.5" fill="#6366f1"/><line x1="19" y1="19" x2="24" y2="24" stroke="#6366f1" stroke-width="2" stroke-linecap="round"/></svg>
+        <span style="font-size:18px;font-weight:700;letter-spacing:-0.3px;">SiteScout</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <a href="#pricing" style="color:var(--muted);font-size:14px;text-decoration:none;transition:color 0.15s;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Pricing</a>
+        <button class="btn-ghost" onclick="showLogin()">Sign in</button>
+        <button class="btn-primary" onclick="showSignup()">Start for free</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <div style="max-width:900px;margin:0 auto;padding:80px 24px 60px;text-align:center;">
+    <div style="display:inline-flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:12px;color:var(--muted);margin-bottom:28px;">
+      <div class="glow-dot"></div>
+      <span>27% of US small businesses have no website — that's your pipeline</span>
+    </div>
+    <h1 style="font-size:clamp(38px,6vw,72px);font-weight:800;line-height:1.08;letter-spacing:-1.5px;margin-bottom:22px;background:linear-gradient(135deg,#f0f0f8 30%,#818cf8 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">
+      Find clients who<br/>need a website.
+    </h1>
+    <p style="font-size:18px;color:var(--muted);line-height:1.7;max-width:580px;margin:0 auto 36px;">
+      Search any city, any niche. SiteScout finds local businesses with no website or a weak one — then writes a personalized outreach email for each one, ready to send.
+    </p>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+      <button class="btn-primary" style="padding:13px 28px;font-size:16px;" onclick="showSignup()">Start free — 3 searches included</button>
+      <button class="btn-secondary" style="padding:13px 28px;font-size:16px;" onclick="showLogin()">Sign in</button>
+    </div>
+    <p style="color:var(--muted);font-size:12px;margin-top:14px;">No credit card required · Cancel anytime</p>
+  </div>
+
+  <!-- How it works -->
+  <div style="max-width:1000px;margin:0 auto;padding:0 24px 80px;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px;">
+      <div class="card" style="padding:28px;">
+        <div style="width:42px;height:42px;background:rgba(99,102,241,0.12);border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;">
+          <svg width="20" height="20" fill="none" stroke="#6366f1" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        </div>
+        <h3 style="font-size:16px;font-weight:600;margin-bottom:8px;">1. Search any niche + city</h3>
+        <p style="font-size:14px;color:var(--muted);line-height:1.6;">Enter "dentists in Phoenix" or "contractors in Dallas" — we pull real local businesses from Google Maps.</p>
+      </div>
+      <div class="card" style="padding:28px;">
+        <div style="width:42px;height:42px;background:rgba(99,102,241,0.12);border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;">
+          <svg width="20" height="20" fill="none" stroke="#6366f1" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2h9"/></svg>
+        </div>
+        <h3 style="font-size:16px;font-weight:600;margin-bottom:8px;">2. Spot the opportunities</h3>
+        <p style="font-size:14px;color:var(--muted);line-height:1.6;">Each result is scored — no website, broken site, or weak mobile presence bubbles to the top. Only the best leads make the cut.</p>
+      </div>
+      <div class="card" style="padding:28px;">
+        <div style="width:42px;height:42px;background:rgba(99,102,241,0.12);border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;">
+          <svg width="20" height="20" fill="none" stroke="#6366f1" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        </div>
+        <h3 style="font-size:16px;font-weight:600;margin-bottom:8px;">3. Send a personalized pitch</h3>
+        <p style="font-size:14px;color:var(--muted);line-height:1.6;">One click generates a cold email that names their specific problem. Add your agency name once — every email is signed from you.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Best niches callout -->
+  <div style="max-width:900px;margin:0 auto;padding:0 24px 80px;">
+    <div class="card" style="padding:32px;border-color:rgba(99,102,241,0.3);background:linear-gradient(135deg,rgba(99,102,241,0.05),transparent);">
+      <div style="display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:240px;">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--accent);font-weight:700;margin-bottom:8px;">High-value niches</div>
+          <h3 style="font-size:20px;font-weight:700;margin-bottom:10px;">Target businesses that pay $3–10k for a site</h3>
+          <p style="font-size:14px;color:var(--muted);line-height:1.6;">The best prospects aren't just "no website" — they're high-revenue, appointment-driven businesses where a good site directly means more clients.</p>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;">
+          <span class="badge badge-amber">⚖️ Law Firms</span>
+          <span class="badge badge-amber">🦷 Dental Practices</span>
+          <span class="badge badge-amber">🔨 Contractors</span>
+          <span class="badge badge-blue">🔧 Auto Repair</span>
+          <span class="badge badge-blue">🏠 Real Estate</span>
+          <span class="badge badge-blue">💆 Med Spas</span>
+          <span class="badge badge-green">🍽️ Restaurants</span>
+          <span class="badge badge-green">💈 Salons</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pricing -->
+  <div id="pricing" style="max-width:900px;margin:0 auto;padding:0 24px 100px;">
+    <div style="text-align:center;margin-bottom:40px;">
+      <h2 style="font-size:32px;font-weight:800;letter-spacing:-0.5px;margin-bottom:10px;">Simple, flat pricing</h2>
+      <p style="color:var(--muted);">Close one client and the tool pays for itself 50x over.</p>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;align-items:start;">
+      <!-- Free -->
+      <div class="card" style="padding:28px;">
+        <div style="font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px;">Free</div>
+        <div style="font-size:42px;font-weight:800;letter-spacing:-1px;margin-bottom:4px;">$0</div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:24px;">try it out</div>
+        <ul style="list-style:none;display:flex;flex-direction:column;gap:10px;margin-bottom:28px;">
+          <li style="display:flex;align-items:center;gap:10px;font-size:14px;"><span style="color:var(--green);">✓</span> 3 searches</li>
+          <li style="display:flex;align-items:center;gap:10px;font-size:14px;"><span style="color:var(--green);">✓</span> Website scoring</li>
+          <li style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--muted);"><span>—</span> AI outreach emails</li>
+          <li style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--muted);"><span>—</span> Lead tracking</li>
+        </ul>
+        <button class="btn-secondary" style="width:100%;" onclick="showSignup()">Get started free</button>
+      </div>
+      <!-- Pro -->
+      <div class="card" style="padding:28px;border-color:var(--accent);position:relative;overflow:hidden;">
+        <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#6366f1,#8b5cf6);"></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <span style="font-size:13px;font-weight:600;color:var(--accent);">Pro</span>
+          <span style="background:var(--accent);color:white;font-size:10px;padding:1px 7px;border-radius:4px;font-weight:700;">POPULAR</span>
+        </div>
+        <div style="font-size:42px;font-weight:800;letter-spacing:-1px;margin-bottom:4px;">$49<span style="font-size:18px;font-weight:500;color:var(--muted);">/mo</span></div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:24px;">per user</div>
+        <ul style="list-style:none;display:flex;flex-direction:column;gap:10px;margin-bottom:28px;">
+          <li style="display:flex;align-items:center;gap:10px;font-size:14px;"><span style="color:var(--green);">✓</span> Unlimited searches</li>
+          <li style="display:flex;align-items:center;gap:10px;font-size:14px;"><span style="color:var(--green);">✓</span> AI outreach emails + SMS</li>
+          <li style="display:flex;align-items:center;gap:10px;font-size:14px;"><span style="color:var(--green);">✓</span> CRM lead tracking</li>
+          <li style="display:flex;align-items:center;gap:10px;font-size:14px;"><span style="color:var(--green);">✓</span> Custom agency name</li>
+        </ul>
+        <button class="btn-primary" style="width:100%;" onclick="handleUpgrade('pro')">Upgrade to Pro</button>
+      </div>
+      <!-- Agency -->
+      <div class="card" style="padding:28px;">
+        <div style="font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px;">Agency</div>
+        <div style="font-size:42px;font-weight:800;letter-spacing:-1px;margin-bottom:4px;">$99<span style="font-size:18px;font-weight:500;color:var(--muted);">/mo</span></div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:24px;">per workspace</div>
+        <ul style="list-style:none;display:flex;flex-direction:column;gap:10px;margin-bottom:28px;">
+          <li style="display:flex;align-items:center;gap:10px;font-size:14px;"><span style="color:var(--green);">✓</span> Everything in Pro</li>
+          <li style="display:flex;align-items:center;gap:10px;font-size:14px;"><span style="color:var(--green);">✓</span> 5 team seats</li>
+          <li style="display:flex;align-items:center;gap:10px;font-size:14px;"><span style="color:var(--green);">✓</span> CSV export</li>
+          <li style="display:flex;align-items:center;gap:10px;font-size:14px;"><span style="color:var(--green);">✓</span> Priority support</li>
+        </ul>
+        <button class="btn-secondary" style="width:100%;" onclick="handleUpgrade('agency')">Upgrade to Agency</button>
+      </div>
+    </div>
+  </div>
+
+  <footer style="border-top:1px solid var(--border);padding:24px;text-align:center;color:var(--muted);font-size:13px;">
+    © 2026 SiteScout · Built for web designers who don't want to spend time finding clients
+  </footer>
+</div>
+
+<!-- ════════════════ APP ════════════════ -->
+<div id="app" class="hidden" style="min-height:100vh;">
+  <!-- App Nav -->
+  <nav style="border-bottom:1px solid var(--border);background:rgba(7,7,16,0.95);backdrop-filter:blur(12px);position:sticky;top:0;z-index:50;">
+    <div style="max-width:1200px;margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:56px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <svg width="24" height="24" viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="13" stroke="#6366f1" stroke-width="2"/><circle cx="14" cy="14" r="7" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="2 2"/><circle cx="14" cy="14" r="2.5" fill="#6366f1"/><line x1="19" y1="19" x2="24" y2="24" stroke="#6366f1" stroke-width="2" stroke-linecap="round"/></svg>
+        <span style="font-size:16px;font-weight:700;">SiteScout</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div id="plan-badge" class="hidden"></div>
+        <button class="btn-ghost" onclick="showTab('search')" id="nav-search" style="font-size:13px;">Search</button>
+        <button class="btn-ghost" onclick="showTab('leads')" id="nav-leads" style="font-size:13px;">My Leads</button>
+        <button class="btn-ghost" onclick="showSettings()" style="font-size:13px;">Settings</button>
+        <button class="btn-ghost" onclick="logout()" style="font-size:13px;color:var(--muted);">Sign out</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Search Tab -->
+  <div id="tab-search" style="max-width:1200px;margin:0 auto;padding:32px 24px;">
+    <!-- Search box -->
+    <div class="card" style="padding:28px;margin-bottom:24px;">
+      <h2 style="font-size:18px;font-weight:700;margin-bottom:6px;">Find your next client</h2>
+      <p style="font-size:14px;color:var(--muted);margin-bottom:20px;">Enter a business type and city. We'll find the best opportunities and rank them by how much they need your help.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <input id="search-query" class="input" placeholder="dentists, contractors, law firms..." style="flex:2;min-width:180px;" />
+        <input id="search-location" class="input" placeholder="city, state (e.g. Phoenix, AZ)" style="flex:2;min-width:180px;" />
+        <button class="btn-primary" id="search-btn" onclick="doSearch()" style="flex-shrink:0;min-width:120px;">
+          <span id="search-btn-text">Search</span>
+        </button>
+      </div>
+
+      <!-- Niche quick-fill -->
+      <div style="margin-top:16px;">
+        <span style="font-size:12px;color:var(--muted);margin-right:8px;">High-value niches:</span>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
+          <button class="niche-pill" onclick="fillNiche('law firms')">⚖️ Law Firms</button>
+          <button class="niche-pill" onclick="fillNiche('dental offices')">🦷 Dental</button>
+          <button class="niche-pill" onclick="fillNiche('home contractors')">🔨 Contractors</button>
+          <button class="niche-pill" onclick="fillNiche('auto repair shops')">🔧 Auto Repair</button>
+          <button class="niche-pill" onclick="fillNiche('medical spas')">💆 Med Spas</button>
+          <button class="niche-pill" onclick="fillNiche('real estate agents')">🏠 Real Estate</button>
+          <button class="niche-pill" onclick="fillNiche('restaurants')">🍽️ Restaurants</button>
+          <button class="niche-pill" onclick="fillNiche('hair salons')">💈 Salons</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Upgrade banner for free users -->
+    <div id="upgrade-banner" class="hidden card" style="padding:16px 20px;margin-bottom:24px;border-color:rgba(99,102,241,0.4);background:linear-gradient(135deg,rgba(99,102,241,0.07),transparent);display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+      <div>
+        <span style="font-weight:600;font-size:14px;">🔒 Free plan:</span>
+        <span id="searches-left-text" style="font-size:14px;color:var(--muted);margin-left:6px;"></span>
+      </div>
+      <button class="btn-primary" style="font-size:13px;padding:8px 16px;" onclick="handleUpgrade('pro')">Upgrade to Pro — $49/mo</button>
+    </div>
+
+    <!-- Search error -->
+    <div id="search-error" class="hidden card" style="padding:16px 20px;margin-bottom:24px;border-color:rgba(239,68,68,0.3);background:rgba(239,68,68,0.05);">
+      <span id="search-error-text" style="font-size:14px;color:#ef4444;"></span>
+    </div>
+
+    <!-- Results -->
+    <div id="search-results"></div>
+  </div>
+
+  <!-- Leads Tab -->
+  <div id="tab-leads" class="hidden" style="max-width:1200px;margin:0 auto;padding:32px 24px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+      <h2 style="font-size:18px;font-weight:700;">My Leads</h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn-ghost" style="font-size:12px;" onclick="filterLeads('all')" id="filter-all">All</button>
+        <button class="btn-ghost" style="font-size:12px;" onclick="filterLeads('new')" id="filter-new">New</button>
+        <button class="btn-ghost" style="font-size:12px;" onclick="filterLeads('contacted')" id="filter-contacted">Contacted</button>
+        <button class="btn-ghost" style="font-size:12px;" onclick="filterLeads('interested')" id="filter-interested">Interested</button>
+        <button class="btn-ghost" style="font-size:12px;" onclick="filterLeads('won')" id="filter-won">Won 🏆</button>
+      </div>
+    </div>
+    <div id="leads-list"></div>
+  </div>
+</div>
+
+<!-- ════════════════ AUTH MODALS ════════════════ -->
+<div id="login-modal" class="modal-backdrop hidden">
+  <div class="modal fade-in">
+    <h2 style="font-size:22px;font-weight:700;margin-bottom:6px;">Welcome back</h2>
+    <p style="font-size:14px;color:var(--muted);margin-bottom:24px;">Sign in to your SiteScout account</p>
+    <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px;">
+      <input id="login-email" class="input" type="email" placeholder="Email address" />
+      <input id="login-password" class="input" type="password" placeholder="Password" />
+    </div>
+    <div id="login-error" class="hidden" style="color:#ef4444;font-size:13px;margin-bottom:12px;"></div>
+    <button class="btn-primary" style="width:100%;margin-bottom:12px;" id="login-btn" onclick="doLogin()">Sign in</button>
+    <p style="text-align:center;font-size:13px;color:var(--muted);">No account? <button class="btn-ghost" style="color:var(--accent);padding:0;" onclick="showSignup()">Sign up free</button></p>
+    <button class="btn-ghost" style="position:absolute;top:16px;right:16px;color:var(--muted);" onclick="closeModals()">✕</button>
+  </div>
+</div>
+
+<div id="signup-modal" class="modal-backdrop hidden">
+  <div class="modal fade-in" style="position:relative;">
+    <h2 style="font-size:22px;font-weight:700;margin-bottom:6px;">Create your account</h2>
+    <p style="font-size:14px;color:var(--muted);margin-bottom:24px;">3 free searches. No credit card required.</p>
+    <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px;">
+      <input id="signup-name" class="input" type="text" placeholder="Your name" />
+      <input id="signup-agency" class="input" type="text" placeholder="Agency or freelancer name (used in emails)" />
+      <input id="signup-email" class="input" type="email" placeholder="Email address" />
+      <input id="signup-password" class="input" type="password" placeholder="Password (min 6 characters)" />
+    </div>
+    <div id="signup-error" class="hidden" style="color:#ef4444;font-size:13px;margin-bottom:12px;"></div>
+    <button class="btn-primary" style="width:100%;margin-bottom:12px;" id="signup-btn" onclick="doSignup()">Create account</button>
+    <p style="text-align:center;font-size:13px;color:var(--muted);">Already have an account? <button class="btn-ghost" style="color:var(--accent);padding:0;" onclick="showLogin()">Sign in</button></p>
+    <button class="btn-ghost" style="position:absolute;top:16px;right:16px;color:var(--muted);" onclick="closeModals()">✕</button>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div id="settings-modal" class="modal-backdrop hidden">
+  <div class="modal fade-in" style="position:relative;">
+    <h2 style="font-size:20px;font-weight:700;margin-bottom:4px;">Settings</h2>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:24px;">Your name and agency appear in every AI-generated email.</p>
+    <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px;">
+      <div>
+        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Your name</label>
+        <input id="settings-name" class="input" type="text" placeholder="e.g. Ryan" />
+      </div>
+      <div>
+        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Agency / freelancer name</label>
+        <input id="settings-agency" class="input" type="text" placeholder="e.g. Apex Web Design" />
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:20px;">
+      <button class="btn-primary" style="flex:1;" onclick="saveSettings()">Save changes</button>
+      <button class="btn-secondary" onclick="closeModals()">Cancel</button>
+    </div>
+    <div style="border-top:1px solid var(--border);padding-top:16px;">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Subscription</div>
+      <div id="sub-info" style="font-size:14px;margin-bottom:12px;"></div>
+      <button class="btn-secondary" style="font-size:13px;" onclick="handleUpgrade('pro')" id="upgrade-btn">Upgrade to Pro — $49/mo</button>
+    </div>
+    <button class="btn-ghost" style="position:absolute;top:16px;right:16px;color:var(--muted);" onclick="closeModals()">✕</button>
+  </div>
+</div>
+
+<!-- Outreach Modal -->
+<div id="outreach-modal" class="modal-backdrop hidden">
+  <div class="modal fade-in" style="max-width:600px;position:relative;max-height:90vh;overflow-y:auto;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+      <div id="outreach-badge"></div>
+      <h2 id="outreach-name" style="font-size:18px;font-weight:700;"></h2>
+    </div>
+    <p id="outreach-address" style="font-size:13px;color:var(--muted);margin-bottom:20px;"></p>
+
+    <div id="outreach-loading" style="text-align:center;padding:40px 0;">
+      <div class="spinner" style="width:24px;height:24px;margin:0 auto 12px;"></div>
+      <p style="font-size:14px;color:var(--muted);">Writing your personalized outreach…</p>
+    </div>
+
+    <div id="outreach-content" class="hidden">
+      <div style="margin-bottom:20px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <span style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);">Email</span>
+          <button class="copy-btn" onclick="copyText('email-subject','email-body')" title="Copy email">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            <span style="font-size:12px;margin-left:4px;">Copy</span>
+          </button>
+        </div>
+        <div style="margin-bottom:6px;font-size:12px;color:var(--muted);">Subject:</div>
+        <div id="email-subject" style="font-size:14px;font-weight:500;margin-bottom:10px;padding:8px 12px;background:var(--surface);border-radius:6px;border:1px solid var(--border);"></div>
+        <pre id="email-body" style="font-size:13px;line-height:1.7;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;white-space:pre-wrap;"></pre>
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <span style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);">SMS</span>
+          <button class="copy-btn" onclick="copyText('sms-text')" title="Copy SMS">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            <span style="font-size:12px;margin-left:4px;">Copy</span>
+          </button>
+        </div>
+        <pre id="sms-text" style="font-size:13px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;white-space:pre-wrap;"></pre>
+        <div id="sms-char-count" style="font-size:11px;color:var(--muted);margin-top:4px;text-align:right;"></div>
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:8px;">Update status</div>
+        <select id="outreach-status" class="input" style="max-width:200px;" onchange="updateLeadStatus()">
+          <option value="new">New</option>
+          <option value="contacted">Contacted</option>
+          <option value="interested">Interested</option>
+          <option value="won">Won 🏆</option>
+          <option value="passed">Passed</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="btn-ghost" style="position:absolute;top:12px;right:12px;color:var(--muted);" onclick="closeModals()">✕</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════ STATE ═══════════════════════════
+let _token = localStorage.getItem('ss_token');
+let _user = null;
+let _currentLeadId = null;
+let _currentFilter = 'all';
+
+// ═══════════════════════════ INIT ═══════════════════════════
+window.addEventListener('load', async () => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('upgraded')) {
+    window.history.replaceState({}, '', '/');
+    if (_token) {
+      await loadUser();
+      showApp();
+      showToast('🎉 Welcome to Pro! Unlimited searches unlocked.', 'green');
+      return;
+    }
+  }
+  if (_token) {
+    try {
+      await loadUser();
+      showApp();
+    } catch {
+      _token = null;
+      localStorage.removeItem('ss_token');
+      showLanding();
+    }
+  } else {
+    showLanding();
+  }
+});
+
+// ═══════════════════════════ AUTH ═══════════════════════════
+async function loadUser() {
+  const res = await apiFetch('/api/auth/me');
+  _user = res;
+  updateUserUI();
+}
+
+function updateUserUI() {
+  if (!_user) return;
+  const badge = document.getElementById('plan-badge');
+  if (_user.subscription_status === 'active') {
+    badge.innerHTML = `<span class="pro-badge">${_user.subscription_plan || 'pro'}</span>`;
+    badge.classList.remove('hidden');
+    document.getElementById('upgrade-banner').classList.add('hidden');
+  } else {
+    badge.classList.add('hidden');
+    const used = _user.searches_used || 0;
+    const remaining = Math.max(0, 3 - used);
+    if (remaining > 0) {
+      document.getElementById('searches-left-text').textContent = `${remaining} free search${remaining !== 1 ? 'es' : ''} remaining`;
+      document.getElementById('upgrade-banner').classList.remove('hidden');
+    } else {
+      document.getElementById('searches-left-text').textContent = 'You\'ve used all free searches';
+      document.getElementById('upgrade-banner').classList.remove('hidden');
+    }
+  }
+}
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  if (!email || !password) return;
+  const btn = document.getElementById('login-btn');
+  btn.innerHTML = '<span class="spinner"></span>';
+  btn.disabled = true;
+  const err = document.getElementById('login-error');
+  err.classList.add('hidden');
+  try {
+    const res = await apiFetch('/api/auth/login', 'POST', { email, password });
+    _token = res.token;
+    _user = res.user;
+    localStorage.setItem('ss_token', _token);
+    closeModals();
+    updateUserUI();
+    showApp();
+  } catch (e) {
+    err.textContent = e.message || 'Invalid email or password';
+    err.classList.remove('hidden');
+  } finally {
+    btn.textContent = 'Sign in';
+    btn.disabled = false;
+  }
+}
+
+async function doSignup() {
+  const full_name = document.getElementById('signup-name').value.trim();
+  const agency_name = document.getElementById('signup-agency').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
+  const password = document.getElementById('signup-password').value;
+  if (!email || !password) return;
+  const btn = document.getElementById('signup-btn');
+  btn.innerHTML = '<span class="spinner"></span>';
+  btn.disabled = true;
+  const err = document.getElementById('signup-error');
+  err.classList.add('hidden');
+  try {
+    const res = await apiFetch('/api/auth/signup', 'POST', { email, password, full_name, agency_name });
+    _token = res.token;
+    localStorage.setItem('ss_token', _token);
+    await loadUser();
+    closeModals();
+    showApp();
+  } catch (e) {
+    err.textContent = e.message || 'Something went wrong';
+    err.classList.remove('hidden');
+  } finally {
+    btn.textContent = 'Create account';
+    btn.disabled = false;
+  }
+}
+
+function logout() {
+  _token = null;
+  _user = null;
+  localStorage.removeItem('ss_token');
+  showLanding();
+}
+
+// ═══════════════════════════ VIEWS ═══════════════════════════
+function showLanding() {
+  document.getElementById('landing').classList.remove('hidden');
+  document.getElementById('app').classList.add('hidden');
+}
+function showApp() {
+  document.getElementById('landing').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  showTab('search');
+}
+function showTab(tab) {
+  ['search', 'leads'].forEach(t => {
+    document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== tab);
+    const navBtn = document.getElementById(`nav-${t}`);
+    if (navBtn) navBtn.style.color = t === tab ? 'var(--text)' : 'var(--muted)';
+  });
+  if (tab === 'leads') loadLeads();
+}
+
+function showLogin() {
+  closeModals();
+  document.getElementById('login-modal').classList.remove('hidden');
+}
+function showSignup() {
+  closeModals();
+  document.getElementById('signup-modal').classList.remove('hidden');
+}
+function closeModals() {
+  ['login-modal','signup-modal','settings-modal','outreach-modal'].forEach(id => {
+    document.getElementById(id).classList.add('hidden');
+  });
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModals(); });
+
+function showSettings() {
+  if (!_user) return;
+  document.getElementById('settings-name').value = _user.full_name || '';
+  document.getElementById('settings-agency').value = _user.agency_name || '';
+  const subInfo = document.getElementById('sub-info');
+  const upgradeBtn = document.getElementById('upgrade-btn');
+  if (_user.subscription_status === 'active') {
+    subInfo.innerHTML = `<span style="color:var(--green);">✓ Pro plan active</span>`;
+    upgradeBtn.textContent = 'Manage billing';
+    upgradeBtn.style.display = '';
+  } else {
+    subInfo.innerHTML = `<span style="color:var(--muted);">Free plan · ${_user.searches_used || 0}/3 searches used</span>`;
+    upgradeBtn.textContent = 'Upgrade to Pro — $49/mo';
+    upgradeBtn.style.display = '';
+  }
+  document.getElementById('settings-modal').classList.remove('hidden');
+}
+
+async function saveSettings() {
+  const full_name = document.getElementById('settings-name').value.trim();
+  const agency_name = document.getElementById('settings-agency').value.trim();
+  try {
+    await apiFetch('/api/auth/me', 'PATCH', { full_name, agency_name });
+    _user.full_name = full_name;
+    _user.agency_name = agency_name;
+    closeModals();
+    showToast('Settings saved', 'green');
+  } catch (e) {
+    showToast(e.message, 'red');
+  }
+}
+
+// ═══════════════════════════ SEARCH ═══════════════════════════
+function fillNiche(niche) {
+  document.getElementById('search-query').value = niche;
+  document.getElementById('search-location').focus();
+}
+
+async function doSearch() {
+  const query = document.getElementById('search-query').value.trim();
+  const location = document.getElementById('search-location').value.trim();
+  if (!query || !location) { showToast('Enter a business type and city', 'amber'); return; }
+
+  const isPaid = _user?.subscription_status === 'active';
+  const used = _user?.searches_used || 0;
+  if (!isPaid && used >= 3) {
+    showToast('Upgrade to Pro for unlimited searches', 'amber');
+    handleUpgrade('pro');
+    return;
+  }
+
+  const btn = document.getElementById('search-btn');
+  const btnText = document.getElementById('search-btn-text');
+  btnText.innerHTML = '<span class="spinner"></span>';
+  btn.disabled = true;
+  document.getElementById('search-error').classList.add('hidden');
+  document.getElementById('search-results').innerHTML = `
+    <div style="text-align:center;padding:60px 20px;">
+      <div class="spinner" style="width:28px;height:28px;margin:0 auto 16px;"></div>
+      <p style="color:var(--muted);font-size:14px;">Scanning Google Maps · Checking website quality…</p>
+    </div>`;
+
+  try {
+    const res = await apiFetch('/api/search', 'POST', { query, location, max_results: 25 });
+    if (_user) {
+      _user.searches_used = res.searches_used || (_user.searches_used || 0) + 1;
+      updateUserUI();
+    }
+    renderResults(res.results || []);
+  } catch (e) {
+    document.getElementById('search-results').innerHTML = '';
+    if (e.status === 402) {
+      document.getElementById('search-error-text').textContent = 'Free plan limit reached. Upgrade to Pro for unlimited searches.';
+      document.getElementById('search-error').classList.remove('hidden');
+      setTimeout(() => handleUpgrade('pro'), 800);
+    } else {
+      document.getElementById('search-error-text').textContent = e.message || 'Search failed. Check your connection.';
+      document.getElementById('search-error').classList.remove('hidden');
+    }
+  } finally {
+    btnText.textContent = 'Search';
+    btn.disabled = false;
+  }
+}
+
+function renderResults(results) {
+  const container = document.getElementById('search-results');
+  if (!results.length) {
+    container.innerHTML = `<div class="card" style="padding:40px;text-align:center;"><p style="color:var(--muted);">No results found. Try a different niche or city.</p></div>`;
+    return;
+  }
+
+  const high = results.filter(r => r.presence_score >= 3);
+  const medium = results.filter(r => r.presence_score === 2);
+  const low = results.filter(r => r.presence_score <= 1);
+
+  let html = `<div style="font-size:13px;color:var(--muted);margin-bottom:14px;">Found <strong style="color:var(--text);">${results.length} businesses</strong> · <strong style="color:#ef4444;">${high.length}</strong> high opportunity · <strong style="color:#f59e0b;">${medium.length}</strong> medium · <strong style="color:var(--muted);">${low.length}</strong> established</div>`;
+
+  html += '<div style="display:flex;flex-direction:column;gap:10px;">';
+  results.forEach((r, i) => {
+    html += renderLeadCard(r, i, true);
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function renderLeadCard(r, index, isSearch = false) {
+  const score = r.presence_score || 0;
+  const label = r.presence_label || 'Unknown';
+  let badgeClass = 'badge-green';
+  if (label === 'No website' || label === 'Broken website') badgeClass = 'badge-red';
+  else if (label === 'Weak website') badgeClass = 'badge-amber';
+  else if (label === 'Low reviews') badgeClass = 'badge-blue';
+
+  const scoreColor = score >= 3 ? '#ef4444' : score >= 2 ? '#f59e0b' : score >= 1 ? '#818cf8' : '#10b981';
+  const scorePct = Math.min(100, score * 20);
+  const hasPhone = r.phone;
+  const id = r.id || `r_${index}`;
+
+  const statusBadge = !isSearch && r.status ? `<span class="status-pill status-${r.status}">${r.status}</span>` : '';
+
+  return `
+  <div class="card fade-in" style="padding:18px 20px;display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;" data-id="${id}">
+    <div style="flex:1;min-width:200px;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+        <span style="font-size:15px;font-weight:600;">${esc(r.name)}</span>
+        ${statusBadge}
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">${esc(r.business_type || '')}${r.address ? ' · ' + esc(r.address) : ''}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+        <span class="badge ${badgeClass}">${esc(label)}</span>
+        ${hasPhone ? `<span class="tag">📞 ${esc(r.phone)}</span>` : ''}
+        ${r.rating ? `<span class="tag">⭐ ${r.rating} (${r.review_count || 0})</span>` : ''}
+        ${r.website ? `<a href="${esc(r.website)}" target="_blank" rel="noopener" style="text-decoration:none;"><span class="tag" style="cursor:pointer;color:var(--muted);">🌐 Website</span></a>` : ''}
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px;min-width:160px;">
+      <div style="text-align:right;">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Opportunity score</div>
+        <div style="font-size:18px;font-weight:700;color:${scoreColor};margin-bottom:4px;">${score}/5</div>
+        <div class="score-bar" style="width:100px;margin-left:auto;">
+          <div class="score-fill" style="width:${scorePct}%;background:${scoreColor};"></div>
+        </div>
+      </div>
+      <button class="btn-primary" style="font-size:12px;padding:7px 14px;" onclick="openOutreach(${r.id || 'null'}, ${JSON.stringify(r).replace(/'/g, '&apos;')})">
+        ✉️ Generate Outreach
+      </button>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════ LEADS ═══════════════════════════
+let _allLeads = [];
+
+async function loadLeads() {
+  const container = document.getElementById('leads-list');
+  container.innerHTML = `<div style="text-align:center;padding:40px;"><div class="spinner" style="width:24px;height:24px;margin:0 auto;"></div></div>`;
+  try {
+    _allLeads = await apiFetch('/api/leads');
+    renderLeads();
+  } catch (e) {
+    container.innerHTML = `<div class="card" style="padding:24px;"><p style="color:var(--muted);">Failed to load leads.</p></div>`;
+  }
+}
+
+function filterLeads(status) {
+  _currentFilter = status;
+  ['all','new','contacted','interested','won'].forEach(s => {
+    const btn = document.getElementById(`filter-${s}`);
+    if (btn) btn.style.color = s === status ? 'var(--text)' : 'var(--muted)';
+  });
+  renderLeads();
+}
+
+function renderLeads() {
+  const container = document.getElementById('leads-list');
+  const filtered = _currentFilter === 'all' ? _allLeads : _allLeads.filter(l => l.status === _currentFilter);
+
+  if (!filtered.length) {
+    container.innerHTML = `<div class="card" style="padding:40px;text-align:center;"><p style="color:var(--muted);">${_currentFilter === 'all' ? 'No leads yet. Run a search to get started.' : `No ${_currentFilter} leads.`}</p></div>`;
+    return;
+  }
+
+  container.innerHTML = `<div style="display:flex;flex-direction:column;gap:10px;">${filtered.map((l, i) => renderLeadCard(l, i, false)).join('')}</div>`;
+}
+
+// ═══════════════════════════ OUTREACH MODAL ═══════════════════════════
+function openOutreach(leadId, leadData) {
+  _currentLeadId = leadId;
+  const modal = document.getElementById('outreach-modal');
+  document.getElementById('outreach-name').textContent = leadData.name || '';
+  document.getElementById('outreach-address').textContent = [leadData.business_type, leadData.address].filter(Boolean).join(' · ');
+
+  const label = leadData.presence_label || '';
+  let badgeClass = 'badge-green';
+  if (label === 'No website' || label === 'Broken website') badgeClass = 'badge-red';
+  else if (label === 'Weak website') badgeClass = 'badge-amber';
+  else if (label === 'Low reviews') badgeClass = 'badge-blue';
+  document.getElementById('outreach-badge').innerHTML = `<span class="badge ${badgeClass}">${esc(label)}</span>`;
+
+  document.getElementById('outreach-loading').classList.remove('hidden');
+  document.getElementById('outreach-content').classList.add('hidden');
+
+  if (leadData.status) {
+    document.getElementById('outreach-status').value = leadData.status;
+  }
+
+  modal.classList.remove('hidden');
+
+  if (!leadId) {
+    document.getElementById('outreach-loading').innerHTML = `<p style="color:var(--muted);font-size:14px;padding:20px 0;">Save this lead first by searching and letting us auto-save it, then open it from My Leads.</p>`;
+    return;
+  }
+
+  fetchOutreach(leadId);
+}
+
+async function fetchOutreach(leadId) {
+  try {
+    const data = await apiFetch(`/api/leads/${leadId}/outreach`, 'POST');
+    document.getElementById('email-subject').textContent = data.email_subject || '';
+    document.getElementById('email-body').textContent = data.email_body || '';
+    document.getElementById('sms-text').textContent = data.sms_text || '';
+    const smsLen = (data.sms_text || '').length;
+    document.getElementById('sms-char-count').textContent = `${smsLen} characters${smsLen > 160 ? ' (over SMS limit — split into 2)' : ''}`;
+    document.getElementById('outreach-loading').classList.add('hidden');
+    document.getElementById('outreach-content').classList.remove('hidden');
+  } catch (e) {
+    document.getElementById('outreach-loading').innerHTML = `<p style="color:#ef4444;font-size:14px;padding:20px 0;">${e.message || 'Failed to generate outreach'}</p>`;
+  }
+}
+
+async function updateLeadStatus() {
+  if (!_currentLeadId) return;
+  const status = document.getElementById('outreach-status').value;
+  try {
+    await apiFetch(`/api/leads/${_currentLeadId}`, 'PATCH', { status });
+    const lead = _allLeads.find(l => l.id === _currentLeadId);
+    if (lead) lead.status = status;
+    showToast('Status updated', 'green');
+  } catch (e) {
+    showToast('Failed to update', 'red');
+  }
+}
+
+// ═══════════════════════════ BILLING ═══════════════════════════
+async function handleUpgrade(plan) {
+  if (!_token) { showSignup(); return; }
+  try {
+    const res = await apiFetch(`/api/billing/checkout/${plan}`);
+    if (res.url) window.location.href = res.url;
+  } catch (e) {
+    showToast(e.message || 'Billing setup error', 'red');
+  }
+}
+
+// ═══════════════════════════ UTILS ═══════════════════════════
+async function apiFetch(path, method = 'GET', body = null) {
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+  };
+  if (_token) opts.headers['Authorization'] = `Bearer ${_token}`;
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(path, opts);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(data.detail || data.message || `Error ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
+  return data;
+}
+
+function esc(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function copyText(...ids) {
+  const parts = ids.map(id => document.getElementById(id)?.textContent || '');
+  const text = ids.length > 1 ? `Subject: ${parts[0]}\n\n${parts[1]}` : parts[0];
+  navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard', 'green'));
+}
+
+let _toastTimer;
+function showToast(msg, type = 'green') {
+  clearTimeout(_toastTimer);
+  let toast = document.getElementById('toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'toast';
+    toast.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:999;padding:12px 18px;border-radius:10px;font-size:14px;font-weight:500;transition:opacity 0.3s;max-width:320px;';
+    document.body.appendChild(toast);
+  }
+  const colors = { green:'background:rgba(16,185,129,0.9);color:#fff;', amber:'background:rgba(245,158,11,0.9);color:#fff;', red:'background:rgba(239,68,68,0.9);color:#fff;' };
+  toast.style.cssText += colors[type] || colors.green;
+  toast.textContent = msg;
+  toast.style.opacity = '1';
+  _toastTimer = setTimeout(() => { toast.style.opacity = '0'; }, 3000);
+}
+
+document.getElementById('search-query').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+document.getElementById('search-location').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+</script>
+</body>
+</html>
