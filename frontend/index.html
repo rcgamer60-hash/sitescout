@@ -713,9 +713,10 @@ function renderLeadCard(r, index, isSearch = false) {
           <div class="score-fill" style="width:${scorePct}%;background:${scoreColor};"></div>
         </div>
       </div>
-      <button class="btn-primary" style="font-size:12px;padding:7px 14px;" onclick="openOutreach(${r.id || 'null'}, ${JSON.stringify(r).replace(/'/g, '&apos;')})">
-        ✉️ Generate Outreach
-      </button>
+      ${r.id
+        ? `<button class="btn-primary" style="font-size:12px;padding:7px 14px;" onclick="openOutreach(${r.id}, ${JSON.stringify(r).replace(/'/g, '&apos;')})">✉️ Generate Outreach</button>`
+        : `<span style="font-size:11px;color:var(--muted);text-align:right;">Low opportunity<br/>not saved</span>`
+      }
     </div>
   </div>`;
 }

@@ -226,14 +226,16 @@ async def search(req: SearchRequest, user: dict = Depends(get_current_user)):
         }
         enriched.append(row)
 
-        # Auto-save high-opportunity leads (score >= 2)
+        # Auto-save high-opportunity leads (score >= 2) and capture DB id
         if score >= 2:
             with get_conn() as conn:
                 exists = conn.execute(
                     "SELECT id FROM leads WHERE user_id = ? AND name = ? AND address = ?",
                     (user["id"], row["name"], row["address"]),
                 ).fetchone()
-                if not exists:
+                if exists:
+                    row["id"] = exists["id"]
+                else:
                     conn.execute(
                         """INSERT INTO leads
                            (user_id, name, business_type, address, phone, website,
@@ -242,6 +244,7 @@ async def search(req: SearchRequest, user: dict = Depends(get_current_user)):
                         (user["id"], row["name"], row["business_type"], row["address"],
                          row["phone"], row["website"], row["presence_score"], row["presence_label"]),
                     )
+                    row["id"] = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     enriched.sort(key=lambda r: r["presence_score"], reverse=True)
 
