@@ -77,13 +77,13 @@ def signup(req: SignupRequest):
     hashed = hash_password(req.password)
     try:
         with get_conn() as conn:
-            conn.execute(
+            row = conn.execute(
                 """INSERT INTO users (email, password_hash, full_name, agency_name)
-                   VALUES (?, ?, ?, ?)""",
+                   VALUES (%s, %s, %s, %s) RETURNING id""",
                 (req.email.lower().strip(), hashed,
                  req.full_name or "", req.agency_name or ""),
-            )
-            user_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+            ).fetchone()
+            user_id = row["id"]
     except Exception:
         raise HTTPException(400, "Email already registered")
     token = create_token(user_id)
@@ -94,7 +94,7 @@ def signup(req: SignupRequest):
 def login(req: LoginRequest):
     with get_conn() as conn:
         row = conn.execute(
-            "SELECT * FROM users WHERE email = ?", (req.email.lower().strip(),)
+            "SELECT * FROM users WHERE email = %s", (req.email.lower().strip(),)
         ).fetchone()
     if not row or not verify_password(req.password, row["password_hash"]):
         raise HTTPException(401, "Invalid email or password")
@@ -112,10 +112,10 @@ def update_profile(req: UpdateProfileRequest, user: dict = Depends(get_current_u
     fields = {k: v for k, v in req.model_dump().items() if v is not None}
     if not fields:
         raise HTTPException(400, "Nothing to update")
-    set_clause = ", ".join(f"{k} = ?" for k in fields)
+    set_clause = ", ".join(f"{k} = %s" for k in fields)
     with get_conn() as conn:
         conn.execute(
-            f"UPDATE users SET {set_clause} WHERE id = ?",
+            f"UPDATE users SET {set_clause} WHERE id = %s",
             [*fields.values(), user["id"]],
         )
     return {"updated": True}
@@ -230,21 +230,22 @@ async def search(req: SearchRequest, user: dict = Depends(get_current_user)):
         if score >= 2:
             with get_conn() as conn:
                 exists = conn.execute(
-                    "SELECT id FROM leads WHERE user_id = ? AND name = ? AND address = ?",
+                    "SELECT id FROM leads WHERE user_id = %s AND name = %s AND address = %s",
                     (user["id"], row["name"], row["address"]),
                 ).fetchone()
                 if exists:
                     row["id"] = exists["id"]
                 else:
-                    conn.execute(
+                    result = conn.execute(
                         """INSERT INTO leads
                            (user_id, name, business_type, address, phone, website,
                             presence_score, presence_label, status)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new')""",
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'new')
+                           RETURNING id""",
                         (user["id"], row["name"], row["business_type"], row["address"],
                          row["phone"], row["website"], row["presence_score"], row["presence_label"]),
-                    )
-                    row["id"] = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+                    ).fetchone()
+                    row["id"] = result["id"]
 
     # Only surface actual opportunities — drop Established (score=0) from results
     enriched = [r for r in enriched if r.get("presence_score", 0) >= 1]
@@ -252,11 +253,11 @@ async def search(req: SearchRequest, user: dict = Depends(get_current_user)):
 
     with get_conn() as conn:
         conn.execute(
-            "UPDATE users SET searches_used = searches_used + 1 WHERE id = ?",
+            "UPDATE users SET searches_used = searches_used + 1 WHERE id = %s",
             (user["id"],),
         )
         conn.execute(
-            "INSERT INTO searches (user_id, query, location, results_count) VALUES (?, ?, ?, ?)",
+            "INSERT INTO searches (user_id, query, location, results_count) VALUES (%s, %s, %s, %s)",
             (user["id"], req.query, req.location, len(enriched)),
         )
 
@@ -282,10 +283,10 @@ def list_leads(
     user: dict = Depends(get_current_user),
 ):
     with get_conn() as conn:
-        q = "SELECT * FROM leads WHERE user_id = ?"
+        q = "SELECT * FROM leads WHERE user_id = %s"
         params = [user["id"]]
         if status:
-            q += " AND status = ?"
+            q += " AND status = %s"
             params.append(status)
         q += " ORDER BY presence_score DESC, created_at DESC"
         rows = conn.execute(q, params).fetchall()
@@ -296,7 +297,7 @@ def list_leads(
 def update_lead(lead_id: int, body: LeadUpdate, user: dict = Depends(get_current_user)):
     with get_conn() as conn:
         row = conn.execute(
-            "SELECT id FROM leads WHERE id = ? AND user_id = ?",
+            "SELECT id FROM leads WHERE id = %s AND user_id = %s",
             (lead_id, user["id"]),
         ).fetchone()
         if not row:
@@ -304,9 +305,9 @@ def update_lead(lead_id: int, body: LeadUpdate, user: dict = Depends(get_current
         fields = {k: v for k, v in body.model_dump().items() if v is not None}
         if not fields:
             raise HTTPException(400, "Nothing to update")
-        set_clause = ", ".join(f"{k} = ?" for k in fields)
+        set_clause = ", ".join(f"{k} = %s" for k in fields)
         conn.execute(
-            f"UPDATE leads SET {set_clause} WHERE id = ?",
+            f"UPDATE leads SET {set_clause} WHERE id = %s",
             [*fields.values(), lead_id],
         )
     return {"updated": True}
@@ -316,7 +317,7 @@ def update_lead(lead_id: int, body: LeadUpdate, user: dict = Depends(get_current
 def delete_lead(lead_id: int, user: dict = Depends(get_current_user)):
     with get_conn() as conn:
         conn.execute(
-            "DELETE FROM leads WHERE id = ? AND user_id = ?",
+            "DELETE FROM leads WHERE id = %s AND user_id = %s",
             (lead_id, user["id"]),
         )
     return {"deleted": True}
@@ -330,7 +331,7 @@ def delete_lead(lead_id: int, user: dict = Depends(get_current_user)):
 def generate_outreach(lead_id: int, user: dict = Depends(get_current_user)):
     with get_conn() as conn:
         row = conn.execute(
-            "SELECT * FROM leads WHERE id = ? AND user_id = ?",
+            "SELECT * FROM leads WHERE id = %s AND user_id = %s",
             (lead_id, user["id"]),
         ).fetchone()
         if not row:
@@ -338,7 +339,7 @@ def generate_outreach(lead_id: int, user: dict = Depends(get_current_user)):
         lead = dict(row)
 
         existing = conn.execute(
-            "SELECT * FROM outreach WHERE lead_id = ? AND user_id = ? ORDER BY id DESC LIMIT 1",
+            "SELECT * FROM outreach WHERE lead_id = %s AND user_id = %s ORDER BY id DESC LIMIT 1",
             (lead_id, user["id"]),
         ).fetchone()
         if existing:
@@ -405,13 +406,11 @@ Rules:
         sms_text = sms_text[:157] + "..."
 
     with get_conn() as conn:
-        conn.execute(
+        row = conn.execute(
             """INSERT INTO outreach (lead_id, user_id, email_subject, email_body, sms_text)
-               VALUES (?, ?, ?, ?, ?)""",
+               VALUES (%s, %s, %s, %s, %s) RETURNING *""",
             (lead_id, user["id"], subject, email_body, sms_text),
-        )
-        oid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-        row = conn.execute("SELECT * FROM outreach WHERE id = ?", (oid,)).fetchone()
+        ).fetchone()
 
     return dict(row)
 
@@ -441,7 +440,7 @@ def create_checkout(plan: str, user: dict = Depends(get_current_user)):
             customer_id = customer["id"]
             with get_conn() as conn:
                 conn.execute(
-                    "UPDATE users SET stripe_customer_id = ? WHERE id = ?",
+                    "UPDATE users SET stripe_customer_id = %s WHERE id = %s",
                     (customer_id, user["id"]),
                 )
 
@@ -484,8 +483,8 @@ async def stripe_webhook(request: Request):
                 plan = "agency"
         with get_conn() as conn:
             conn.execute(
-                """UPDATE users SET subscription_status = ?, subscription_plan = ?
-                   WHERE stripe_customer_id = ?""",
+                """UPDATE users SET subscription_status = %s, subscription_plan = %s
+                   WHERE stripe_customer_id = %s""",
                 ("active" if status == "active" else "canceled", plan, customer_id),
             )
 
@@ -494,7 +493,7 @@ async def stripe_webhook(request: Request):
         customer_id = sub["customer"]
         with get_conn() as conn:
             conn.execute(
-                "UPDATE users SET subscription_status = 'free', subscription_plan = '' WHERE stripe_customer_id = ?",
+                "UPDATE users SET subscription_status = 'free', subscription_plan = '' WHERE stripe_customer_id = %s",
                 (customer_id,),
             )
 

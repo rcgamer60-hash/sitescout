@@ -42,7 +42,7 @@ def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
     token = authorization.split(" ", 1)[1]
     user_id = decode_token(token)
     with get_conn() as conn:
-        row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        row = conn.execute("SELECT * FROM users WHERE id = %s", (user_id,)).fetchone()
     if not row:
         raise HTTPException(401, "User not found")
     return dict(row)
