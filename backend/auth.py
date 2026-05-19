@@ -1,24 +1,23 @@
 import os
+import bcrypt
 import jwt
 from datetime import datetime, timedelta, timezone
-from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, Header
 from typing import Optional
 
 from database import get_conn
 
-_pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 JWT_SECRET = os.getenv("JWT_SECRET", "sitescout-dev-secret-change-in-prod")
 JWT_ALGO = "HS256"
 JWT_EXPIRY_DAYS = 30
 
 
 def hash_password(plain: str) -> str:
-    return _pwd.hash(plain)
+    return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return _pwd.verify(plain, hashed)
+    return bcrypt.checkpw(plain.encode(), hashed.encode())
 
 
 def create_token(user_id: int) -> str:
