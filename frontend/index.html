@@ -761,11 +761,11 @@ function renderResults(results) {
     return;
   }
 
-  const high = results.filter(r => r.presence_score >= 3);
-  const medium = results.filter(r => r.presence_score === 2);
-  const low = results.filter(r => r.presence_score <= 1);
+  const noSite = results.filter(r => r.presence_label === 'No website' || r.presence_label === 'Broken website');
+  const weak = results.filter(r => r.presence_label === 'Weak website');
+  const basic = results.filter(r => r.presence_label === 'Basic website');
 
-  let html = `<div style="font-size:13px;color:var(--muted);margin-bottom:14px;"><strong style="color:var(--text);">${results.length} opportunities found</strong> · <strong style="color:#ef4444;">${high.length}</strong> high · <strong style="color:#f59e0b;">${medium.length}</strong> medium · <span style="color:var(--muted);">established businesses filtered out</span></div>`;
+  let html = `<div style="font-size:13px;color:var(--muted);margin-bottom:14px;"><strong style="color:var(--text);">${results.length} opportunities</strong> · <strong style="color:#ef4444;">${noSite.length} no/broken site</strong> · <strong style="color:#f59e0b;">${weak.length} weak</strong> · <strong style="color:#818cf8;">${basic.length} basic</strong></div>`;
 
   html += '<div style="display:flex;flex-direction:column;gap:10px;">';
   results.forEach((r, i) => {
@@ -783,7 +783,7 @@ function renderLeadCard(r, index, isSearch = false) {
   else if (label === 'Weak website') badgeClass = 'badge-amber';
   else if (label === 'Low reviews') badgeClass = 'badge-blue';
 
-  const scoreColor = score >= 3 ? '#ef4444' : score >= 2 ? '#f59e0b' : score >= 1 ? '#818cf8' : '#10b981';
+  const scoreColor = score >= 4 ? '#ef4444' : score >= 3 ? '#f97316' : score >= 2 ? '#f59e0b' : score >= 1 ? '#818cf8' : '#10b981';
   const scorePct = Math.min(100, score * 20);
   const hasPhone = r.phone;
   const id = r.id || `r_${index}`;

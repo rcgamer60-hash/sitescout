@@ -136,21 +136,24 @@ async def check_website_quality(url: str) -> dict:
         soup = BeautifulSoup(resp.text, "html.parser")
         text = resp.text.lower()
 
+        word_count = len(soup.get_text().split())
+        img_count = len(soup.find_all("img"))
+
         signals = {
             "alive": resp.status_code < 400,
-            "has_mobile": "viewport" in text,
-            "has_contact": any(w in text for w in ["contact", "email", "phone"]),
-            "has_social": any(w in text for w in ["facebook.com", "instagram.com", "twitter.com"]),
-            "word_count": len(soup.get_text().split()),
+            "has_mobile": "viewport" in text,         # modern responsive site
+            "has_content": word_count > 250,           # actual page content
+            "has_images": img_count > 2,               # real designed pages have images
+            "word_count": word_count,
             "page_size_kb": round(len(resp.content) / 1024, 1),
         }
 
         score = 0
         if signals["has_mobile"]:
             score += 1
-        if signals["has_contact"]:
+        if signals["has_content"]:
             score += 1
-        if signals["has_social"]:
+        if signals["has_images"]:
             score += 1
 
         signals["quality_score"] = score

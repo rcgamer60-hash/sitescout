@@ -195,32 +195,29 @@ async def search(req: SearchRequest, user: dict = Depends(get_current_user)):
             quality = {}
 
         website = details.get("website")
-        review_count = details.get("review_count") or place.get("review_count", 0)
         rating = details.get("rating") or place.get("rating")
-        web_quality = quality.get("quality_score", 0) if quality else 0
-        web_alive = quality.get("alive", True) if quality else True
+        review_count = details.get("review_count") or place.get("review_count", 0)
+        web_quality = quality.get("quality_score", 0) if isinstance(quality, dict) else 0
+        web_alive = quality.get("alive", False) if isinstance(quality, dict) else False
 
-        score = 0
+        # Score is purely based on website quality — clean 0-5 scale
         if not website:
-            score += 2
-        elif not web_alive:
-            score += 2
-        elif web_quality < 2:
-            score += 1
-        if review_count < 15:
-            score += 1
-        if rating and rating < 4.0:
-            score += 1
-
-        if not website:
+            score = 5
             label = "No website"
         elif not web_alive:
+            score = 4
             label = "Broken website"
-        elif web_quality < 2:
+        elif web_quality == 0:
+            score = 3
             label = "Weak website"
-        elif review_count < 15:
-            label = "Low reviews"
+        elif web_quality == 1:
+            score = 2
+            label = "Weak website"
+        elif web_quality == 2:
+            score = 1
+            label = "Basic website"
         else:
+            score = 0
             label = "Established"
 
         row = {
