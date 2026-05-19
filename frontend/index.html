@@ -657,7 +657,10 @@ async function doSearch() {
 function renderResults(results) {
   const container = document.getElementById('search-results');
   if (!results.length) {
-    container.innerHTML = `<div class="card" style="padding:40px;text-align:center;"><p style="color:var(--muted);">No results found. Try a different niche or city.</p></div>`;
+    container.innerHTML = `<div class="card" style="padding:32px;text-align:center;">
+      <p style="color:var(--text);font-weight:600;margin-bottom:8px;">No weak websites found here</p>
+      <p style="color:var(--muted);font-size:13px;line-height:1.6;">Every business in this search has a solid website. Try a <strong style="color:var(--text);">smaller city</strong> or a more local niche — cleaners, handymen, plumbers, and landscapers tend to have the worst web presence.</p>
+    </div>`;
     return;
   }
 
@@ -665,7 +668,7 @@ function renderResults(results) {
   const medium = results.filter(r => r.presence_score === 2);
   const low = results.filter(r => r.presence_score <= 1);
 
-  let html = `<div style="font-size:13px;color:var(--muted);margin-bottom:14px;">Found <strong style="color:var(--text);">${results.length} businesses</strong> · <strong style="color:#ef4444;">${high.length}</strong> high opportunity · <strong style="color:#f59e0b;">${medium.length}</strong> medium · <strong style="color:var(--muted);">${low.length}</strong> established</div>`;
+  let html = `<div style="font-size:13px;color:var(--muted);margin-bottom:14px;"><strong style="color:var(--text);">${results.length} opportunities found</strong> · <strong style="color:#ef4444;">${high.length}</strong> high · <strong style="color:#f59e0b;">${medium.length}</strong> medium · <span style="color:var(--muted);">established businesses filtered out</span></div>`;
 
   html += '<div style="display:flex;flex-direction:column;gap:10px;">';
   results.forEach((r, i) => {

@@ -151,8 +151,8 @@ async def search(req: SearchRequest, user: dict = Depends(get_current_user)):
     if not is_paid and searches_used >= FREE_SEARCH_LIMIT:
         raise HTTPException(402, f"Free plan limited to {FREE_SEARCH_LIMIT} searches. Upgrade to Pro for unlimited.")
 
-    # Pull from Google Places
-    places = await search_businesses(req.query, req.location, req.max_results)
+    # Pull wide net from Google Places — fetch 60 raw, filter down to opportunities
+    places = await search_businesses(req.query, req.location, 60)
     if not places:
         return {"found": 0, "results": []}
 
@@ -246,6 +246,8 @@ async def search(req: SearchRequest, user: dict = Depends(get_current_user)):
                     )
                     row["id"] = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
+    # Only surface actual opportunities — drop Established (score=0) from results
+    enriched = [r for r in enriched if r.get("presence_score", 0) >= 1]
     enriched.sort(key=lambda r: r["presence_score"], reverse=True)
 
     with get_conn() as conn:
