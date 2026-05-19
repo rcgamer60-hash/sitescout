@@ -301,9 +301,9 @@
     <!-- Search box -->
     <div class="card" style="padding:28px;margin-bottom:24px;">
       <h2 style="font-size:18px;font-weight:700;margin-bottom:6px;">Find your next client</h2>
-      <p style="font-size:14px;color:var(--muted);margin-bottom:20px;">Enter a business type and city. We'll find the best opportunities and rank them by how much they need your help.</p>
+      <p style="font-size:14px;color:var(--muted);margin-bottom:20px;">Enter a city — optionally narrow by business type. We'll find local businesses with weak or no websites and rank them by opportunity.</p>
       <div class="search-row" style="display:flex;gap:10px;flex-wrap:wrap;">
-        <input id="search-query" class="input" placeholder="dentists, contractors, law firms..." style="flex:2;min-width:180px;" />
+        <input id="search-query" class="input" placeholder="Business type (optional)" style="flex:2;min-width:180px;" />
         <input id="search-location" class="input" placeholder="city, state (e.g. Phoenix, AZ)" style="flex:2;min-width:180px;" />
         <button class="btn-primary" id="search-btn" onclick="doSearch()" style="flex-shrink:0;min-width:120px;">
           <span id="search-btn-text">Search</span>
@@ -707,7 +707,7 @@ function fillNiche(niche) {
 async function doSearch() {
   const query = document.getElementById('search-query').value.trim();
   const location = document.getElementById('search-location').value.trim();
-  if (!query || !location) { showToast('Enter a business type and city', 'amber'); return; }
+  if (!location) { showToast('Enter a city to search', 'amber'); return; }
 
   const isPaid = _user?.subscription_status === 'active';
   const used = _user?.searches_used || 0;
@@ -816,7 +816,7 @@ function renderLeadCard(r, index, isSearch = false) {
       </div>
       ${r.id
         ? `<button class="btn-primary" style="font-size:12px;padding:8px 16px;white-space:nowrap;" onclick="openOutreach(${r.id}, ${JSON.stringify(r).replace(/'/g, '&apos;')})">✉️ Generate Outreach</button>`
-        : `<span style="font-size:11px;color:var(--muted);text-align:right;">Low opportunity<br/>not saved</span>`
+        : ''
       }
     </div>
   </div>`;

@@ -42,6 +42,14 @@ app.add_middleware(
 @app.on_event("startup")
 def startup():
     init_db()
+    admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
+    if admin_email:
+        with get_conn() as conn:
+            conn.execute(
+                """UPDATE users SET subscription_status='active', subscription_plan='agency'
+                   WHERE email = %s""",
+                (admin_email,),
+            )
 
 
 @app.get("/")
@@ -138,7 +146,7 @@ def _safe_user(u: dict) -> dict:
 # ═══════════════════════════════════════════════════════════
 
 class SearchRequest(BaseModel):
-    query: str
+    query: Optional[str] = ""
     location: str
     max_results: int = 20
 
@@ -151,8 +159,10 @@ async def search(req: SearchRequest, user: dict = Depends(get_current_user)):
     if not is_paid and searches_used >= FREE_SEARCH_LIMIT:
         raise HTTPException(402, f"Free plan limited to {FREE_SEARCH_LIMIT} searches. Upgrade to Pro for unlimited.")
 
+    search_query = (req.query or "").strip() or "local businesses"
+
     # Pull wide net from Google Places — fetch 60 raw, filter down to opportunities
-    places = await search_businesses(req.query, req.location, 60)
+    places = await search_businesses(search_query, req.location, 60)
     if not places:
         return {"found": 0, "results": []}
 
@@ -226,8 +236,8 @@ async def search(req: SearchRequest, user: dict = Depends(get_current_user)):
         }
         enriched.append(row)
 
-        # Auto-save high-opportunity leads (score >= 2) and capture DB id
-        if score >= 2:
+        # Auto-save all opportunity leads (score >= 1) and capture DB id
+        if score >= 1:
             with get_conn() as conn:
                 exists = conn.execute(
                     "SELECT id FROM leads WHERE user_id = %s AND name = %s AND address = %s",
@@ -258,7 +268,7 @@ async def search(req: SearchRequest, user: dict = Depends(get_current_user)):
         )
         conn.execute(
             "INSERT INTO searches (user_id, query, location, results_count) VALUES (%s, %s, %s, %s)",
-            (user["id"], req.query, req.location, len(enriched)),
+            (user["id"], search_query, req.location, len(enriched)),
         )
 
     return {
