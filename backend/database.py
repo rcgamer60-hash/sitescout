@@ -2,6 +2,7 @@ import os
 import psycopg2
 import psycopg2.extras
 from contextlib import contextmanager
+from urllib.parse import urlparse, unquote
 
 FREE_SEARCH_LIMIT = 3
 
@@ -62,7 +63,17 @@ _CREATE_TABLES = [
 
 def _connect():
     url = os.getenv("DATABASE_URL", "")
-    return psycopg2.connect(url, cursor_factory=psycopg2.extras.RealDictCursor)
+    p = urlparse(url)
+    return psycopg2.connect(
+        host=p.hostname,
+        port=p.port or 5432,
+        dbname=(p.path or "/postgres").lstrip("/"),
+        user=unquote(p.username or ""),
+        password=unquote(p.password or ""),
+        sslmode="require",
+        cursor_factory=psycopg2.extras.RealDictCursor,
+        connect_timeout=10,
+    )
 
 
 def init_db():
