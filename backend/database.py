@@ -62,9 +62,7 @@ _CREATE_TABLES = [
 
 def _connect():
     url = os.getenv("DATABASE_URL", "")
-    # Supabase requires SSL
-    return psycopg2.connect(url, sslmode="require",
-                            cursor_factory=psycopg2.extras.RealDictCursor)
+    return psycopg2.connect(url, cursor_factory=psycopg2.extras.RealDictCursor)
 
 
 def init_db():
