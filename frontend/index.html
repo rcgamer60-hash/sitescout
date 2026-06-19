@@ -509,6 +509,32 @@
   </div>
 </div>
 
+<!-- META AD MODAL -->
+<div id="meta-ad-modal" class="modal-backdrop hidden">
+  <div class="modal fade-in" style="max-width:660px;position:relative;max-height:90vh;overflow-y:auto;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+      <div id="meta-ad-badge"></div>
+      <h2 id="meta-ad-name" style="font-size:18px;font-weight:700;"></h2>
+    </div>
+    <p id="meta-ad-address" style="font-size:13px;color:var(--muted);margin-bottom:20px;"></p>
+
+    <div id="meta-ad-loading" style="text-align:center;padding:40px 0;">
+      <div class="spinner" style="width:24px;height:24px;margin:0 auto 12px;"></div>
+      <p style="font-size:14px;color:var(--muted);">Writing research-backed Meta ad copy…</p>
+    </div>
+
+    <div id="meta-ad-content" class="hidden">
+      <div id="meta-ad-tabs" style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;"></div>
+      <div id="meta-ad-body"></div>
+      <div style="margin-top:16px;padding:12px 16px;background:var(--surface);border-radius:8px;border:1px solid var(--border);font-size:12px;color:var(--muted);line-height:1.6;">
+        <strong style="color:var(--text);">Targeting:</strong> 15-mile radius · Car enthusiasts · Recent vehicle purchasers · $20-50/day per ad set · Kill at $20 spent with 0 leads
+      </div>
+    </div>
+
+    <button class="btn-ghost" style="position:absolute;top:12px;right:12px;color:var(--muted);" onclick="closeModals()">✕</button>
+  </div>
+</div>
+
 <script>
 // ═══════════════════════════ STATE ═══════════════════════════
 let _token = localStorage.getItem('ss_token');
@@ -660,7 +686,7 @@ function showSignup() {
   document.getElementById('signup-modal').classList.remove('hidden');
 }
 function closeModals() {
-  ['login-modal','signup-modal','settings-modal','outreach-modal'].forEach(id => {
+  ['login-modal','signup-modal','settings-modal','outreach-modal','meta-ad-modal'].forEach(id => {
     document.getElementById(id).classList.add('hidden');
   });
 }
@@ -815,7 +841,8 @@ function renderLeadCard(r, index, isSearch = false) {
         </div>
       </div>
       ${r.id
-        ? `<button class="btn-primary" style="font-size:12px;padding:8px 16px;white-space:nowrap;" onclick="openOutreach(${r.id}, ${JSON.stringify(r).replace(/'/g, '&apos;')})">✉️ Generate Outreach</button>`
+        ? `<button class="btn-primary" style="font-size:12px;padding:8px 16px;white-space:nowrap;" onclick="openOutreach(${r.id}, ${JSON.stringify(r).replace(/'/g, '&apos;')})">✉️ Generate Outreach</button>
+           <button class="btn-ghost" style="font-size:12px;padding:8px 16px;white-space:nowrap;border:1px solid var(--border);" onclick="openMetaAd(${r.id}, ${JSON.stringify(r).replace(/'/g, '&apos;')})">📢 Meta Ad Copy</button>`
         : ''
       }
     </div>
@@ -914,6 +941,90 @@ async function updateLeadStatus() {
   } catch (e) {
     showToast('Failed to update', 'red');
   }
+}
+
+// ═══════════════════════════ META AD GENERATOR ═══════════════════════════
+let _metaAdLeadId = null;
+
+function openMetaAd(leadId, leadData) {
+  _metaAdLeadId = leadId;
+  const modal = document.getElementById('meta-ad-modal');
+  document.getElementById('meta-ad-name').textContent = leadData.name || '';
+  document.getElementById('meta-ad-address').textContent = [leadData.business_type, leadData.address].filter(Boolean).join(' · ');
+
+  const label = leadData.presence_label || '';
+  let badgeClass = 'badge-green';
+  if (label === 'No website' || label === 'Broken website') badgeClass = 'badge-red';
+  else if (label === 'Weak website') badgeClass = 'badge-amber';
+  document.getElementById('meta-ad-badge').innerHTML = `<span class="badge ${badgeClass}">${esc(label)}</span>`;
+
+  document.getElementById('meta-ad-loading').classList.remove('hidden');
+  document.getElementById('meta-ad-content').classList.add('hidden');
+  modal.classList.remove('hidden');
+  fetchMetaAd(leadId);
+}
+
+async function fetchMetaAd(leadId) {
+  try {
+    const data = await apiFetch(`/api/leads/${leadId}/meta-ad`, 'POST');
+    const ads = data.ads || [];
+    const tabs = document.getElementById('meta-ad-tabs');
+    const body = document.getElementById('meta-ad-body');
+
+    tabs.innerHTML = ads.map((ad, i) =>
+      `<button onclick="showMetaAdTab(${i})" id="meta-tab-${i}" style="font-size:12px;padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:${i===0?'var(--accent)':'var(--surface)'};color:${i===0?'#fff':'var(--text)'};cursor:pointer;">${ad.label}</button>`
+    ).join('');
+
+    body.innerHTML = ads.map((ad, i) =>
+      `<div id="meta-ad-panel-${i}" style="display:${i===0?'block':'none'};">
+        <div style="margin-bottom:12px;">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:4px;">Primary Text</div>
+          <pre style="font-size:13px;line-height:1.7;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;white-space:pre-wrap;">${esc(ad.primary_text)}</pre>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+          <div>
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:4px;">Headline</div>
+            <div style="font-size:14px;font-weight:600;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;">${esc(ad.headline)}</div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:4px;">CTA</div>
+            <div style="font-size:14px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;">${esc(ad.cta)}</div>
+          </div>
+        </div>
+        <div style="margin-bottom:8px;">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:4px;">Visual Guidance</div>
+          <div style="font-size:13px;color:var(--muted);padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;">${esc(ad.visual)}</div>
+        </div>
+        <button class="copy-btn" style="width:100%;justify-content:center;padding:10px;" onclick="copyMetaAd(${i})">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          <span style="font-size:12px;margin-left:6px;">Copy This Ad</span>
+        </button>
+      </div>`
+    ).join('');
+
+    document.getElementById('meta-ad-loading').classList.add('hidden');
+    document.getElementById('meta-ad-content').classList.remove('hidden');
+    _metaAdCache = ads;
+  } catch (e) {
+    document.getElementById('meta-ad-loading').innerHTML = `<p style="color:#ef4444;font-size:14px;padding:20px 0;">${e.message || 'Failed to generate ads'}</p>`;
+  }
+}
+
+let _metaAdCache = [];
+
+function showMetaAdTab(i) {
+  _metaAdCache.forEach((_, j) => {
+    document.getElementById(`meta-ad-panel-${j}`).style.display = j === i ? 'block' : 'none';
+    const btn = document.getElementById(`meta-tab-${j}`);
+    if (btn) { btn.style.background = j === i ? 'var(--accent)' : 'var(--surface)'; btn.style.color = j === i ? '#fff' : 'var(--text)'; }
+  });
+}
+
+function copyMetaAd(i) {
+  const ad = _metaAdCache[i];
+  if (!ad) return;
+  const text = `PRIMARY TEXT:\n${ad.primary_text}\n\nHEADLINE: ${ad.headline}\nCTA: ${ad.cta}\nVISUAL: ${ad.visual}`;
+  navigator.clipboard.writeText(text).then(() => showToast('Ad copied!', 'green')).catch(() => showToast('Copy failed', 'red'));
 }
 
 // ═══════════════════════════ BILLING ═══════════════════════════
