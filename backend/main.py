@@ -436,6 +436,29 @@ Rules:
     if len(sms_text) > 160:
         sms_text = sms_text[:157] + "..."
 
+    # Haiku for cold call script (cheap, conversational)
+    first_name = sender.split()[0] if sender else "I"
+    call_prompt = f"""Write a 30-second cold call opener for a web designer calling a local business.
+
+Caller: {first_name} from {agency}
+Business: {biz_name} ({biz_type}) in {city}
+Situation: {presence.lower()}
+
+Format as a natural script with stage directions in [brackets]. Include:
+1. Opener (5 sec): name drop + quick permission ask
+2. Hook (10 sec): call out their exact situation ({presence.lower()}), make it feel personal not generic
+3. Offer (10 sec): free mockup, no commitment, takes 20 min to build
+4. Close (5 sec): soft yes/no question — "Would it be worth a 2-minute look?"
+
+Keep it under 120 words. Sound like a real person, not a sales robot. Output ONLY the script."""
+
+    call_resp = ai().messages.create(
+        model=HAIKU,
+        max_tokens=250,
+        messages=[{"role": "user", "content": call_prompt}],
+    )
+    call_script = call_resp.content[0].text.strip()
+
     with get_conn() as conn:
         row = conn.execute(
             """INSERT INTO outreach (lead_id, user_id, email_subject, email_body, sms_text)
@@ -443,7 +466,9 @@ Rules:
             (lead_id, user["id"], subject, email_body, sms_text),
         ).fetchone()
 
-    return dict(row)
+    result = dict(row)
+    result["call_script"] = call_script
+    return result
 
 
 @app.post("/api/leads/{lead_id}/meta-ad")

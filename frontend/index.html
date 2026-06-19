@@ -494,6 +494,18 @@
       </div>
 
       <div style="margin-bottom:20px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <span style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);">Cold Call Script</span>
+          <button class="copy-btn" onclick="copyText('call-script')" title="Copy script">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            <span style="font-size:12px;margin-left:4px;">Copy</span>
+          </button>
+        </div>
+        <pre id="call-script" style="font-size:13px;line-height:1.75;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;white-space:pre-wrap;"></pre>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;">💡 Objection handlers: <strong style="color:var(--text);">"I'm busy"</strong> → "Can I text you the site I built? 5 seconds." &nbsp;|&nbsp; <strong style="color:var(--text);">"Have one"</strong> → "When'd you last update it? Most older sites don't convert on mobile."</div>
+      </div>
+
+      <div style="margin-bottom:20px;">
         <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:8px;">Update status</div>
         <select id="outreach-status" class="input" style="max-width:200px;" onchange="updateLeadStatus()">
           <option value="new">New</option>
@@ -923,6 +935,7 @@ async function fetchOutreach(leadId) {
     document.getElementById('sms-text').textContent = data.sms_text || '';
     const smsLen = (data.sms_text || '').length;
     document.getElementById('sms-char-count').textContent = `${smsLen} characters${smsLen > 160 ? ' (over SMS limit — split into 2)' : ''}`;
+    document.getElementById('call-script').textContent = data.call_script || '';
     document.getElementById('outreach-loading').classList.add('hidden');
     document.getElementById('outreach-content').classList.remove('hidden');
   } catch (e) {
