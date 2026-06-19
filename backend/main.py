@@ -41,15 +41,19 @@ app.add_middleware(
 
 @app.on_event("startup")
 def startup():
-    init_db()
-    admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
-    if admin_email:
-        with get_conn() as conn:
-            conn.execute(
-                """UPDATE users SET subscription_status='active', subscription_plan='agency'
-                   WHERE email = %s""",
-                (admin_email,),
-            )
+    try:
+        init_db()
+        admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
+        if admin_email:
+            with get_conn() as conn:
+                conn.execute(
+                    """UPDATE users SET subscription_status='active', subscription_plan='agency'
+                       WHERE email = %s""",
+                    (admin_email,),
+                )
+    except Exception as e:
+        # DB may be temporarily unavailable (e.g. Supabase paused) — app still boots
+        print(f"[startup] DB init warning: {e}")
 
 
 @app.get("/")
