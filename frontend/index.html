@@ -458,7 +458,10 @@
   <div class="modal fade-in" style="max-width:600px;position:relative;max-height:90vh;overflow-y:auto;">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
       <div id="outreach-badge"></div>
-      <h2 id="outreach-name" style="font-size:18px;font-weight:700;"></h2>
+      <h2 id="outreach-name" style="font-size:18px;font-weight:700;flex:1;"></h2>
+      <a id="outreach-call-btn" href="#" style="display:none;align-items:center;gap:6px;background:#1a3a1a;border:1px solid #2a5a2a;color:#4ade80;font-size:12px;font-weight:600;padding:6px 12px;border-radius:20px;text-decoration:none;white-space:nowrap;">
+        📞 <span id="outreach-phone-label"></span>
+      </a>
     </div>
     <p id="outreach-address" style="font-size:13px;color:var(--muted);margin-bottom:20px;"></p>
 
@@ -902,6 +905,16 @@ function openOutreach(leadId, leadData) {
   const modal = document.getElementById('outreach-modal');
   document.getElementById('outreach-name').textContent = leadData.name || '';
   document.getElementById('outreach-address').textContent = [leadData.business_type, leadData.address].filter(Boolean).join(' · ');
+
+  const callBtn = document.getElementById('outreach-call-btn');
+  const phone = (leadData.phone || '').trim();
+  if (phone) {
+    callBtn.href = `tel:${phone.replace(/\D/g,'')}`;
+    document.getElementById('outreach-phone-label').textContent = phone;
+    callBtn.style.display = 'flex';
+  } else {
+    callBtn.style.display = 'none';
+  }
 
   const label = leadData.presence_label || '';
   let badgeClass = 'badge-green';
