@@ -462,6 +462,9 @@
       <a id="outreach-call-btn" href="#" style="display:none;align-items:center;gap:6px;background:#1a3a1a;border:1px solid #2a5a2a;color:#4ade80;font-size:12px;font-weight:600;padding:6px 12px;border-radius:20px;text-decoration:none;white-space:nowrap;">
         📞 <span id="outreach-phone-label"></span>
       </a>
+      <a id="outreach-website-btn" href="#" target="_blank" rel="noopener" style="display:none;align-items:center;gap:5px;background:#1a1a2e;border:1px solid #2a2a4a;color:#818cf8;font-size:12px;font-weight:600;padding:6px 12px;border-radius:20px;text-decoration:none;white-space:nowrap;">
+        🔗 Site
+      </a>
     </div>
     <p id="outreach-address" style="font-size:13px;color:var(--muted);margin-bottom:20px;"></p>
 
@@ -914,6 +917,15 @@ function openOutreach(leadId, leadData) {
     callBtn.style.display = 'flex';
   } else {
     callBtn.style.display = 'none';
+  }
+
+  const siteBtn = document.getElementById('outreach-website-btn');
+  const website = (leadData.website || '').trim();
+  if (website) {
+    siteBtn.href = website.startsWith('http') ? website : `https://${website}`;
+    siteBtn.style.display = 'flex';
+  } else {
+    siteBtn.style.display = 'none';
   }
 
   const label = leadData.presence_label || '';
