@@ -466,7 +466,12 @@
         🔗 Site
       </a>
     </div>
-    <p id="outreach-address" style="font-size:13px;color:var(--muted);margin-bottom:20px;"></p>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:6px;margin-bottom:16px;">
+      <p id="outreach-address" style="font-size:13px;color:var(--muted);flex:1;margin:0;"></p>
+      <button id="contacted-btn" onclick="markContacted()" style="display:flex;align-items:center;gap:6px;background:#1e1e3a;border:1px solid #3a3a6a;color:#a5b4fc;font-size:12px;font-weight:600;padding:6px 14px;border-radius:20px;cursor:pointer;white-space:nowrap;transition:all .2s;">
+        ✓ Mark Contacted
+      </button>
+    </div>
 
     <div id="outreach-loading" style="text-align:center;padding:40px 0;">
       <div class="spinner" style="width:24px;height:24px;margin:0 auto 12px;"></div>
@@ -940,6 +945,7 @@ function openOutreach(leadId, leadData) {
 
   if (leadData.status) {
     document.getElementById('outreach-status').value = leadData.status;
+    syncContactedBtn(leadData.status);
   }
 
   modal.classList.remove('hidden');
@@ -976,8 +982,40 @@ async function updateLeadStatus() {
     const lead = _allLeads.find(l => l.id === _currentLeadId);
     if (lead) lead.status = status;
     showToast('Status updated', 'green');
+    syncContactedBtn(status);
   } catch (e) {
     showToast('Failed to update', 'red');
+  }
+}
+
+async function markContacted() {
+  if (!_currentLeadId) return;
+  const btn = document.getElementById('contacted-btn');
+  try {
+    await apiFetch(`/api/leads/${_currentLeadId}`, 'PATCH', { status: 'contacted' });
+    const lead = _allLeads.find(l => l.id === _currentLeadId);
+    if (lead) lead.status = 'contacted';
+    document.getElementById('outreach-status').value = 'contacted';
+    syncContactedBtn('contacted');
+    showToast('Marked as contacted', 'green');
+  } catch (e) {
+    showToast('Failed to update', 'red');
+  }
+}
+
+function syncContactedBtn(status) {
+  const btn = document.getElementById('contacted-btn');
+  if (!btn) return;
+  if (status === 'contacted') {
+    btn.textContent = '✓ Contacted';
+    btn.style.background = '#1a3a1a';
+    btn.style.borderColor = '#2a5a2a';
+    btn.style.color = '#4ade80';
+  } else {
+    btn.textContent = '✓ Mark Contacted';
+    btn.style.background = '#1e1e3a';
+    btn.style.borderColor = '#3a3a6a';
+    btn.style.color = '#a5b4fc';
   }
 }
 
