@@ -840,6 +840,7 @@ function renderLeadCard(r, index, isSearch = false) {
   const statusBadge = !isSearch && r.status ? `<span class="status-pill status-${r.status}">${r.status}</span>` : '';
 
   const phoneRaw = r.phone ? r.phone.replace(/\D/g, '') : '';
+  if (r.id) _leadCache[r.id] = r;
   return `
   <div class="card fade-in lead-card-row" style="padding:18px 20px;display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;" data-id="${id}">
     <div style="flex:1;min-width:200px;">
@@ -864,8 +865,8 @@ function renderLeadCard(r, index, isSearch = false) {
         </div>
       </div>
       ${r.id
-        ? `<button class="btn-primary" style="font-size:12px;padding:8px 16px;white-space:nowrap;" onclick="openOutreach(${r.id}, ${JSON.stringify(r).replace(/'/g, '&apos;')})">✉️ Generate Outreach</button>
-           <button class="btn-ghost" style="font-size:12px;padding:8px 16px;white-space:nowrap;border:1px solid var(--border);" onclick="openMetaAd(${r.id}, ${JSON.stringify(r).replace(/'/g, '&apos;')})">📢 Meta Ad Copy</button>`
+        ? `<button class="btn-primary" style="font-size:12px;padding:8px 16px;white-space:nowrap;" onclick="openOutreach(${r.id})">✉️ Generate Outreach</button>
+           <button class="btn-ghost" style="font-size:12px;padding:8px 16px;white-space:nowrap;border:1px solid var(--border);" onclick="openMetaAd(${r.id})">📢 Meta Ad Copy</button>`
         : ''
       }
     </div>
@@ -874,6 +875,7 @@ function renderLeadCard(r, index, isSearch = false) {
 
 // ═══════════════════════════ LEADS ═══════════════════════════
 let _allLeads = [];
+let _leadCache = {}; // id → lead obj, avoids JSON.stringify in onclick attrs
 
 async function loadLeads() {
   const container = document.getElementById('leads-list');
@@ -900,7 +902,17 @@ function renderLeads() {
   const filtered = _currentFilter === 'all' ? _allLeads : _allLeads.filter(l => l.status === _currentFilter);
 
   if (!filtered.length) {
-    container.innerHTML = `<div class="card" style="padding:40px;text-align:center;"><p style="color:var(--muted);">${_currentFilter === 'all' ? 'No leads yet. Run a search to get started.' : `No ${_currentFilter} leads.`}</p></div>`;
+    container.innerHTML = _currentFilter === 'all'
+      ? `<div class="card" style="padding:60px 40px;text-align:center;">
+           <div style="font-size:40px;margin-bottom:16px;">🔍</div>
+           <p style="color:var(--text);font-size:16px;font-weight:600;margin-bottom:8px;">No leads yet</p>
+           <p style="color:var(--muted);font-size:14px;margin-bottom:24px;">Search a city and business type above to find prospects who need a website.</p>
+           <button class="btn-primary" onclick="document.getElementById('search-city').focus()">Run your first search →</button>
+         </div>`
+      : `<div class="card" style="padding:48px 40px;text-align:center;">
+           <div style="font-size:36px;margin-bottom:12px;">📭</div>
+           <p style="color:var(--muted);font-size:14px;">No <strong style="color:var(--text)">${_currentFilter}</strong> leads. Move leads here by updating their status.</p>
+         </div>`;
     return;
   }
 
@@ -909,6 +921,7 @@ function renderLeads() {
 
 // ═══════════════════════════ OUTREACH MODAL ═══════════════════════════
 function openOutreach(leadId, leadData) {
+  leadData = leadData || _leadCache[leadId] || _allLeads.find(l => l.id == leadId) || {};
   _currentLeadId = leadId;
   const modal = document.getElementById('outreach-modal');
   document.getElementById('outreach-name').textContent = leadData.name || '';
@@ -1023,6 +1036,7 @@ function syncContactedBtn(status) {
 let _metaAdLeadId = null;
 
 function openMetaAd(leadId, leadData) {
+  leadData = leadData || _leadCache[leadId] || _allLeads.find(l => l.id == leadId) || {};
   _metaAdLeadId = leadId;
   const modal = document.getElementById('meta-ad-modal');
   document.getElementById('meta-ad-name').textContent = leadData.name || '';
