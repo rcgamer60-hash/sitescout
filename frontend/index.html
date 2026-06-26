@@ -852,7 +852,13 @@ function renderLeadCard(r, index, isSearch = false) {
       <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
         <span class="badge ${badgeClass}">${esc(label)}</span>
         ${hasPhone ? `<a href="tel:+1${phoneRaw}" style="text-decoration:none;"><span class="tag" style="color:var(--green);cursor:pointer;">📞 ${esc(r.phone)}</span></a>` : ''}
-        ${r.rating ? `<span class="tag">⭐ ${r.rating} (${r.review_count || 0})</span>` : ''}
+        ${r.rating ? (() => {
+          const lowReviews = (r.review_count||0) < 10;
+          const lowRating  = parseFloat(r.rating) < 4.0;
+          const hook = lowReviews ? ' — few reviews' : lowRating ? ' — low rating' : '';
+          const red  = lowReviews || lowRating;
+          return `<span class="tag" style="${red ? 'background:rgba(239,68,68,0.1);color:#ef4444;' : ''}" title="${red ? 'Pitch hook: mention this in your opener' : ''}">⭐ ${r.rating} (${r.review_count||0}${hook})</span>`;
+        })() : ''}
         ${r.website ? `<a href="${esc(r.website)}" target="_blank" rel="noopener" style="text-decoration:none;"><span class="tag" style="cursor:pointer;color:var(--muted);">🌐 Website</span></a>` : ''}
       </div>
     </div>
