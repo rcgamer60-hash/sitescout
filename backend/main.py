@@ -28,6 +28,21 @@ STRIPE_AGENCY_PRICE_ID = os.getenv("STRIPE_AGENCY_PRICE_ID", "")
 HAIKU = "claude-haiku-4-5-20251001"
 SONNET = "claude-sonnet-4-6"
 
+OUTREACH_TOOL = {
+    "name": "outreach_package",
+    "description": "Cold outreach copy package for a local business lead: email, SMS, and call script.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "email_subject": {"type": "string"},
+            "email_body": {"type": "string"},
+            "sms_text": {"type": "string", "description": "Hard max 155 characters"},
+            "call_script": {"type": "string"},
+        },
+        "required": ["email_subject", "email_body", "sms_text", "call_script"],
+    },
+}
+
 
 def ai() -> anthropic.Anthropic:
     return anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
@@ -359,7 +374,7 @@ def delete_lead(lead_id: int, user: dict = Depends(get_current_user)):
 
 
 # ═══════════════════════════════════════════════════════════
-# AI OUTREACH — Haiku for SMS, Sonnet for email
+# AI OUTREACH — one Sonnet tool call generates email+SMS+call script together
 # ═══════════════════════════════════════════════════════════
 
 @app.post("/api/leads/{lead_id}/outreach")
@@ -387,81 +402,54 @@ def generate_outreach(lead_id: int, user: dict = Depends(get_current_user)):
     biz_type = lead.get("business_type") or "local business"
     city = (lead.get("address") or "").split(",")[0]
 
-    # Sonnet for email (quality matters)
-    email_prompt = f"""You are {sender} from {agency}, a web design agency reaching out to local businesses.
+    first_name = sender.split()[0] if sender else "Ryan"
+    outreach_prompt = f"""You are {sender} from {agency}, a web design agency reaching out to local businesses.
 
 Business: {biz_name}
 Type: {biz_type}
 City: {city}
 Website status: {presence}
 
-Write a personalized cold outreach email. Rules:
+Write a complete cold outreach package using the outreach_package tool: an email, an SMS, and a call script — all for the same business, all sounding like the same real person, never robotic or template-like.
+
+EMAIL rules:
 - Under 120 words
-- Sound like a real person, never robotic or template-like
 - Reference their exact situation: {presence.lower()}
-- Mention that you can show them a FREE website mockup — no strings attached
+- Mention you can show them a FREE website mockup — no strings attached
 - Soft CTA: ask if they'd be open to seeing it (yes/no question)
 - Sign as {sender} from {agency}
 
-Format exactly:
-Subject: [subject line]
-
-[email body]"""
-
-    email_resp = ai().messages.create(
-        model=SONNET,
-        max_tokens=400,
-        messages=[{"role": "user", "content": email_prompt}],
-    )
-    raw = email_resp.content[0].text.strip()
-    lines = raw.split("\n", 2)
-    subject = lines[0].replace("Subject:", "").strip()
-    email_body = lines[2].strip() if len(lines) > 2 else raw
-
-    # Haiku for SMS (short, cheap)
-    sms_prompt = f"""Write a cold SMS from {sender} to a local business owner.
-
-Business: {biz_name}, {biz_type}, {city}
-Situation: {presence.lower()}
-
-Rules:
+SMS rules:
 - HARD MAX 155 characters — count every character
-- One line: name the problem, one line: offer a free mockup
-- End with "Worth a look? - {sender.split()[0] if sender else 'Ryan'}"
+- One clause naming the problem, one clause offering a free mockup
+- End with "Worth a look? - {first_name}"
 - No emojis, no links
-- Output ONLY the SMS text, nothing else"""
 
-    sms_resp = ai().messages.create(
-        model=HAIKU,
-        max_tokens=80,
-        messages=[{"role": "user", "content": sms_prompt}],
+CALL SCRIPT rules:
+- 30-second cold call opener with stage directions in [brackets]
+- Opener (5 sec): name drop + quick permission ask
+- Hook (10 sec): call out their exact situation ({presence.lower()}), make it feel personal not generic
+- Offer (10 sec): free mockup, no commitment, takes 20 min to build
+- Close (5 sec): soft yes/no question — "Would it be worth a 2-minute look?"
+- Under 120 words total"""
+
+    outreach_resp = ai().messages.create(
+        model=SONNET,
+        max_tokens=900,
+        tools=[OUTREACH_TOOL],
+        tool_choice={"type": "tool", "name": "outreach_package"},
+        messages=[{"role": "user", "content": outreach_prompt}],
     )
-    sms_text = sms_resp.content[0].text.strip()
+    package = next(
+        block.input for block in outreach_resp.content
+        if block.type == "tool_use" and block.name == "outreach_package"
+    )
+    subject = package["email_subject"].strip()
+    email_body = package["email_body"].strip()
+    sms_text = package["sms_text"].strip()
     if len(sms_text) > 160:
         sms_text = sms_text[:157] + "..."
-
-    # Haiku for cold call script (cheap, conversational)
-    first_name = sender.split()[0] if sender else "I"
-    call_prompt = f"""Write a 30-second cold call opener for a web designer calling a local business.
-
-Caller: {first_name} from {agency}
-Business: {biz_name} ({biz_type}) in {city}
-Situation: {presence.lower()}
-
-Format as a natural script with stage directions in [brackets]. Include:
-1. Opener (5 sec): name drop + quick permission ask
-2. Hook (10 sec): call out their exact situation ({presence.lower()}), make it feel personal not generic
-3. Offer (10 sec): free mockup, no commitment, takes 20 min to build
-4. Close (5 sec): soft yes/no question — "Would it be worth a 2-minute look?"
-
-Keep it under 120 words. Sound like a real person, not a sales robot. Output ONLY the script."""
-
-    call_resp = ai().messages.create(
-        model=HAIKU,
-        max_tokens=250,
-        messages=[{"role": "user", "content": call_prompt}],
-    )
-    call_script = call_resp.content[0].text.strip()
+    call_script = package["call_script"].strip()
 
     with get_conn() as conn:
         row = conn.execute(
