@@ -76,11 +76,19 @@ def _connect():
     )
 
 
+_ALTER_TABLES = [
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS scanner_addon_status TEXT DEFAULT 'inactive'",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS scanner_stripe_subscription_id TEXT",
+]
+
+
 def init_db():
     conn = _connect()
     try:
         with conn.cursor() as cur:
             for stmt in _CREATE_TABLES:
+                cur.execute(stmt)
+            for stmt in _ALTER_TABLES:
                 cur.execute(stmt)
         conn.commit()
     finally:

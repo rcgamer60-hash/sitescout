@@ -19,11 +19,14 @@ from auth import create_token, get_current_user, hash_password, verify_password
 from database import FREE_SEARCH_LIMIT, get_conn, init_db
 from places import search_businesses, get_place_details
 from scraper import check_website_quality
+from scanner import get_market_mode, get_scan, get_strength
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 STRIPE_PRO_PRICE_ID = os.getenv("STRIPE_PRO_PRICE_ID", "")
 STRIPE_AGENCY_PRICE_ID = os.getenv("STRIPE_AGENCY_PRICE_ID", "")
+STRIPE_SCANNER_PRICE_ID = os.getenv("STRIPE_SCANNER_PRICE_ID", "")
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "").strip().lower()
 
 HAIKU = "claude-haiku-4-5-20251001"
 SONNET = "claude-sonnet-4-6"
@@ -181,7 +184,14 @@ def _safe_user(u: dict) -> dict:
         "subscription_status": u.get("subscription_status") or "free",
         "subscription_plan": u.get("subscription_plan") or "",
         "searches_used": u.get("searches_used") or 0,
+        "scanner_addon_status": u.get("scanner_addon_status") or "inactive",
     }
+
+
+def require_scanner_access(user: dict = Depends(get_current_user)) -> dict:
+    if user.get("scanner_addon_status") != "active" and user.get("email", "").lower() != ADMIN_EMAIL:
+        raise HTTPException(402, "Scanner add-on required")
+    return user
 
 
 # ═══════════════════════════════════════════════════════════
@@ -524,15 +534,41 @@ Return ONLY valid JSON, no markdown:
 
 
 # ═══════════════════════════════════════════════════════════
+# TRADING SCANNER (paid add-on)
+# ═══════════════════════════════════════════════════════════
+
+@app.get("/api/trading/market-mode")
+async def trading_market_mode(user: dict = Depends(require_scanner_access)):
+    return await get_market_mode()
+
+
+@app.get("/api/trading/scan")
+async def trading_scan(user: dict = Depends(require_scanner_access)):
+    return await get_scan()
+
+
+@app.get("/api/trading/strength")
+async def trading_strength(user: dict = Depends(require_scanner_access)):
+    return await get_strength()
+
+
+# ═══════════════════════════════════════════════════════════
 # BILLING — Stripe Checkout
 # ═══════════════════════════════════════════════════════════
+
+_PLAN_PRICE_IDS = {
+    "pro": STRIPE_PRO_PRICE_ID,
+    "agency": STRIPE_AGENCY_PRICE_ID,
+    "scanner": STRIPE_SCANNER_PRICE_ID,
+}
+
 
 @app.get("/api/billing/checkout/{plan}")
 def create_checkout(plan: str, user: dict = Depends(get_current_user)):
     if not stripe.api_key:
         raise HTTPException(503, "Stripe not configured")
 
-    price_id = STRIPE_PRO_PRICE_ID if plan == "pro" else STRIPE_AGENCY_PRICE_ID
+    price_id = _PLAN_PRICE_IDS.get(plan)
     if not price_id:
         raise HTTPException(503, f"Stripe price ID for '{plan}' not configured")
 
@@ -552,12 +588,13 @@ def create_checkout(plan: str, user: dict = Depends(get_current_user)):
                     (customer_id, user["id"]),
                 )
 
+        success_param = "scanner_upgraded=1" if plan == "scanner" else "upgraded=1"
         session = stripe.checkout.Session.create(
             customer=customer_id,
             payment_method_types=["card"],
             line_items=[{"price": price_id, "quantity": 1}],
             mode="subscription",
-            success_url=f"{base_url}/?upgraded=1",
+            success_url=f"{base_url}/?{success_param}",
             cancel_url=f"{base_url}/?canceled=1",
             metadata={"user_id": str(user["id"]), "plan": plan},
         )
@@ -578,31 +615,35 @@ async def stripe_webhook(request: Request):
 
     etype = event["type"]
 
-    if etype in ("customer.subscription.created", "customer.subscription.updated"):
+    if etype in ("customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"):
         sub = event["data"]["object"]
         customer_id = sub["customer"]
         status = sub["status"]
-        plan = ""
+        deleted = etype == "customer.subscription.deleted"
+
+        price_id = None
         if sub.get("items", {}).get("data"):
             price_id = sub["items"]["data"][0]["price"]["id"]
-            if price_id == STRIPE_PRO_PRICE_ID:
-                plan = "pro"
-            elif price_id == STRIPE_AGENCY_PRICE_ID:
-                plan = "agency"
-        with get_conn() as conn:
-            conn.execute(
-                """UPDATE users SET subscription_status = %s, subscription_plan = %s
-                   WHERE stripe_customer_id = %s""",
-                ("active" if status == "active" else "canceled", plan, customer_id),
-            )
 
-    elif etype == "customer.subscription.deleted":
-        sub = event["data"]["object"]
-        customer_id = sub["customer"]
-        with get_conn() as conn:
-            conn.execute(
-                "UPDATE users SET subscription_status = 'free', subscription_plan = '' WHERE stripe_customer_id = %s",
-                (customer_id,),
-            )
+        # Each subscription only ever carries ONE of our products' price_id — branch
+        # on it so a scanner add-on event never clobbers the pro/agency plan columns
+        # (and vice versa) for customers who have both.
+        if price_id == STRIPE_SCANNER_PRICE_ID:
+            with get_conn() as conn:
+                conn.execute(
+                    """UPDATE users SET scanner_addon_status = %s, scanner_stripe_subscription_id = %s
+                       WHERE stripe_customer_id = %s""",
+                    ("inactive" if deleted else ("active" if status == "active" else "canceled"),
+                     None if deleted else sub["id"], customer_id),
+                )
+        elif price_id in (STRIPE_PRO_PRICE_ID, STRIPE_AGENCY_PRICE_ID):
+            plan = "" if deleted else ("pro" if price_id == STRIPE_PRO_PRICE_ID else "agency")
+            new_status = "free" if deleted else ("active" if status == "active" else "canceled")
+            with get_conn() as conn:
+                conn.execute(
+                    """UPDATE users SET subscription_status = %s, subscription_plan = %s
+                       WHERE stripe_customer_id = %s""",
+                    (new_status, plan, customer_id),
+                )
 
     return {"received": True}
